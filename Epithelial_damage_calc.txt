@@ -1,0 +1,214 @@
+var roi_label = newArray;
+var Bronchial_area = newArray;
+var Lumen_area = newArray;
+var Epithelium_area  =newArray;
+var Epithelium_circularity = newArray;
+var Lumen_circularity = newArray;
+var Epithelium_thickness = newArray;
+var Bronchial_feret_diameter = newArray;
+var Lumen_feret_diameter = newArray;
+var nsamples;
+
+macro "Ep_damage_calc [F4]" {
+    close("*");
+    setOption("ExpandableArrays", true);
+    imagepath = getDirectory("Choose directory containing Images:");
+    setup();
+    img_list = getFileList(imagepath);
+    pathfolderlist = split(imagepath,"\\");
+    prefixfolder = pathfolderlist[pathfolderlist.length-1];
+    
+    for (k = 0;k<img_list.length;k++) {
+        if (endsWith(img_list[k], ".tif")) {
+            title = img_list[k];
+            open(imagepath+title);
+            imname = File.nameWithoutExtension;
+            selectWindow(title);
+            run("Duplicate...", "title="+imname);
+            selectWindow(title);
+            close();
+            
+            roi_path = imagepath+imname+File.separator;
+            //print("ROI path is:", roi_path);
+            if (File.isDirectory(roi_path) == true ) {
+                
+                run("Set Scale...", "distance=0 known=0 unit=pixel");
+                roi_list = getFileList(roi_path);
+                for (r = 0;r<roi_list.length;r++) {
+                    //check_roi = roi_list[r];
+                    if (endsWith(roi_list[r],"roi") == true) {
+                        roiManager("Open", roi_path+roi_list[r]);
+                    } 
+                }
+                cnt = roiManager("Count");
+                Epithelial_morphometry (imname, cnt, nsamples);
+                roiManager("reset");
+                //Array.print(roi_label);
+                selectWindow(imname);
+                close();
+            }
+            else{
+                roiManager("reset");
+                selectWindow(imname);
+                close();
+            }
+        }
+    }
+    output_folder = imagepath+prefixfolder;
+
+    Table.showArrays("Output", roi_label, Bronchial_area, Lumen_area, Epithelium_area, Epithelium_circularity, Lumen_circularity, Epithelium_thickness, Bronchial_feret_diameter, Lumen_feret_diameter);
+
+    Table.save(output_folder+"_result.csv", Table.title);
+    if (isOpen(Table.title)) {
+       selectWindow(Table.title);
+       run("Close"); 
+    }
+    if (isOpen("ROI Manager")) {
+        selectWindow("ROI Manager");
+        run("Close");
+    }
+    close("*");
+    roi_label = newArray;
+    Bronchial_area = newArray;
+    Lumen_area = newArray;
+    Epithelium_area  =newArray;
+    Epithelium_circularity = newArray;
+    Lumen_circularity = newArray;
+    Epithelium_thickness = newArray;
+    Bronchial_feret_diameter = newArray;
+    Lumen_feret_diameter = newArray;
+    nsamples;
+}
+
+
+// ......................................................
+
+function Epithelial_morphometry (imname, cnt, nsamples) {
+    setForegroundColor(0, 0, 0);
+    if (cnt >0) {
+        t_roi_label = newArray;
+        t_Bronchial_area = newArray;
+        t_Lumen_area = newArray;
+        t_Epithelium_area  =newArray;
+        t_Epithelium_circularity = newArray;
+        t_Lumen_circularity = newArray;
+        t_Epithelium_thickness = newArray;
+        t_Bronchial_feret_diameter = newArray;
+        t_Lumen_feret_diameter = newArray;
+        selectWindow(imname);
+        run("Select None");
+        run("8-bit");
+        run("Auto Threshold", "method=Huang black");
+        //run("Fill Holes");
+        for (m = 0; m<cnt; m++) {
+            selectWindow(imname);
+            roiManager("Select",m);
+            List.setMeasurements;
+            t_roi_label = RoiManager.getName(m);
+            print("ROI label:", t_roi_label);
+            t_Bronchial_area = List.getValue ("Area");
+            t_Bronchial_feret_diameter = List.getValue ("Feret");
+            t_Epithelium_circularity = List.getValue ("Circ.");
+            centroid_x = List.getValue ("X");
+            centroid_y = List.getValue ("Y");
+            run("Select None");
+            doWand(centroid_x, centroid_y, 0, "smooth");
+            List.setMeasurements;
+            t_Lumen_area = List.getValue ("Area");
+            t_Epithelium_area = t_Bronchial_area-t_Lumen_area;
+            t_Lumen_feret_diameter = List.getValue ("Feret");
+            t_Lumen_circularity = List.getValue ("Circ.");
+            run("Select None");
+            img = imname+"-1";
+            selectWindow(imname);
+            run("Duplicate...", "title="+img);
+            selectWindow(img);
+            roiManager("Select",m);
+            //run("Flatten");
+
+            //saveAs("png",imagepath+img+m+"Bronchi.png");
+
+            //selectWindow(img+m+"Bronchi.png");
+            //close();
+            getSelectionCoordinates(xpoints,ypoints);
+            xpoints_len = xpoints.length;
+            if (nsamples > Math.round(xpoints_len/3) || nsamples ==0) {
+                nsamples = Math.round(xpoints_len/3);
+            }
+            samples = Random_indices(xpoints_len);
+            Array.trim(samples, nsamples);
+            roiManager("show none");
+            for (j=0;j<nsamples;j++) {
+                pos = samples[j];
+            
+                makeLine(centroid_x, centroid_y, xpoints[pos], ypoints[pos]);
+                run("Draw", "slice");
+                run("Select None");
+
+            }
+            run("Select None");
+            imageCalculator("Difference", img, imname);
+            selectWindow(img);
+            run("Convert to Mask");
+            //run("Flatten");
+            //saveAs("png",imagepath+img+m+"Epithelial_thickness.png");
+            //selectWindow(img+m+"Epithelial_thickness.png");
+            //close();
+            run("Set Measurements...", "feret's display redirect=None decimal=3");
+            run("Analyze Particles...", "display");
+            //wait(10000);
+            selectWindow(img);
+            close();
+            if (isOpen("Results")) {
+                res = nResults;
+                for (n=0;n<res;n++) {
+                    samp_total+ = getResult("Feret",n);
+                }
+                t_Epithelium_thickness = samp_total/res;
+            }
+            selectWindow("Results");
+            run("Close");
+            roi_label = Array.concat(roi_label,t_roi_label);
+            Bronchial_area = Array.concat(Bronchial_area,t_Bronchial_area);
+            Lumen_area = Array.concat(Lumen_area,t_Lumen_area);
+            Epithelium_area  = Array.concat(Epithelium_area,t_Epithelium_area);
+            Epithelium_circularity = Array.concat(Epithelium_circularity,t_Epithelium_circularity);
+            Lumen_circularity = Array.concat(Lumen_circularity,t_Lumen_circularity);
+            Epithelium_thickness = Array.concat(Epithelium_thickness,t_Epithelium_thickness);
+            Bronchial_feret_diameter = Array.concat(Bronchial_feret_diameter,t_Bronchial_feret_diameter);
+            Lumen_feret_diameter = Array.concat(Lumen_feret_diameter,t_Lumen_feret_diameter);
+        }
+        
+    } 
+}
+
+// ......................................................
+
+// ......................................................
+
+function Random_indices(arr_len){
+    pos = newArray(arr_len);
+    for (r = 0;r<arr_len;r++){
+        pos[r] = random();
+        // print("Random number is:", pos[r]);
+    }
+    ranks = Array.rankPositions(pos);
+    rand_indices = Array.rankPositions(ranks);
+    //Array.show(rand_indices);
+    return rand_indices;
+}
+
+// ......................................................
+
+// ......................................................
+
+function setup() {
+    Dialog.create ("Choose Number of sample lines to be\n drawn for measuring epithelial thickness:");
+    Dialog.addNumber ("No. of lines:",200);
+    Dialog.show();
+    nsamples = Dialog.getNumber();
+    
+}
+
+// ......................................................
+

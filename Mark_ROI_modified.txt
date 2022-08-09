@@ -1,0 +1,93 @@
+// Macro for ROI marking and saving the ROI to a specific folder named by image name
+var input_file_ext;
+macro " Batch ROI marking [F9]"{
+
+path=getDirectory("Choose directory! "); 
+list=getFileList(path);
+image_ext();
+for (i=0;i<list.length;i++){
+	if(endsWith(list[i],input_file_ext)){
+		open(path+list[i]);
+		
+		a=getTitle();
+		dotIndex = indexOf(a,input_file_ext);
+		newfoldername = substring(a,0,dotIndex);
+		
+		newfolderpath = path+"/"+newfoldername+"/";
+		//File.makeDirectory(newfolderpath);
+		selectWindow(a);
+		// Roi.remove;
+		run("Duplicate...", "title=original"); 
+		selectWindow(a);
+		close();
+		b=1; cnt =0;
+		selectWindow("original");
+		setTool("polygon");
+		title = "Mark Region of interest";
+		msg = "This macro allows you to mark ROI and save \n using the polygon tool mark the ROI and click \"OK\". \n If you are finished marking ROI for the opened image just click  Shift + OK \n without selecting anything on the image.";
+  		waitForUser(title, msg);
+		if (isKeyDown("Shift") == true) {
+					selectWindow("original");
+					run("Close");
+					cnt = 0;
+					//selectWindow("ROI Manager");
+					//run("Close");
+				}
+				else {
+					roiManager("Add");
+					selectWindow("ROI Manager");
+				
+				
+					//print(b);
+					cnt = roiManager("Count");
+				}
+		
+		
+			while (cnt != 0) {
+				
+				File.makeDirectory(newfolderpath);			
+				roiManager("Select", 0);
+				roiManager("Save", newfolderpath+b+".roi");
+				run("Clear", "slice");
+				Roi.remove;
+				roiManager("reset");
+				
+				selectWindow("original");
+				setTool("polygon");
+				title = "Mark another Region of interest";
+				msg = "This macro allows you to mark more ROI and save \n using the polygon tool mark the ROI and click \"OK\". \n If you are finished marking ROI for the opened image just click Shift + OK \n without selecting anything on the image.";
+  				waitForUser(title, msg);
+				if (isKeyDown("Shift") == true) {
+					selectWindow("original");
+					run("Close");
+					cnt = 0;
+					selectWindow("ROI Manager");
+					run("Close");
+				}
+				else {
+				selectWindow("ROI Manager");
+				roiManager("Add");
+				b=b+1;
+				//print(b);
+				cnt = roiManager("Count");
+				}
+			}
+			
+		
+
+	}
+}
+
+}
+
+// ......................................................
+function image_ext () {
+	ext_input = newArray(".tif", ".png", ".jpg", ".jpeg");
+	default_ext_input = newArray(1,0,0);
+	Dialog.create("Choose the extension of the images to be processed");
+	Dialog.addRadioButtonGroup("Select extension of \n input images", ext_input, 1, 4, default_ext_input[0]);
+	Dialog.show();
+	input_file_ext = Dialog.getRadioButton();
+}
+
+// ......................................................

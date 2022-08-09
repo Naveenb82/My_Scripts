@@ -1,0 +1,98 @@
+macro "Mark_bronchi_outer_bound [F2]" {
+    
+    path=getDirectory("Choose directory! ");
+    list=getFileList(path);
+    for (f = 0;f<list.length;f++) {
+        if (endsWith(list[f],".tif") || endsWith(list[f],".jpg")) {
+            open(path+list[f]);
+
+            title = getTitle();
+            imname = File.nameWithoutExtension;
+            selectWindow(title);
+            run("Duplicate...", "title="+imname);
+            selectWindow(title);
+            close();
+            Select_Bronchi (path,imname);
+        }
+    } 
+    
+}
+
+
+
+
+// ****************************************************************
+function Select_Bronchi (path,imname) {
+    new_folder = imname;
+    newfolderpath = path+"/"+new_folder+"/";
+    roiManager("reset");
+    selectWindow(imname);
+    run("Set Scale...", "distance=0 known=0 unit=pixel");
+    //counter = 0;
+    setTool("polygon");
+    title = "Select Bronchus";
+    msg = "Select the outer boundary of the bronchus \n using the polygon tool and click \"OK\". \n If you wish to skip the image Shift + OK.";
+    waitForUser(title, msg);
+    if (isKeyDown("Shift") == false) {
+        run("Interpolate", "interval=1");
+        roiManager("add");
+       
+        cnt = roiManager("Count");
+        roi = cnt;
+        ROI_name = imname+"_ROI_"+roi+"_outer_bound";
+        roiManager("select", (cnt-1));
+        roiManager("rename",ROI_name);
+        run("Select None");
+    }
+
+    while (isKeyDown("Shift") == false) {
+        
+        title = "Select Another Bronchus";
+        msg = "Select the outer boundary of the bronchus \n using the polygon tool and click \"OK\". \n If you wish to skip the image Shift + OK.";
+        waitForUser(title, msg);
+        if (isKeyDown("Shift") == false) {
+            run("Interpolate", "interval=1");
+            roiManager("add");
+                
+            cnt = roiManager("Count");
+            roi = cnt;
+                
+            ROI_name = imname+"_ROI_"+roi+"_outer_bound";
+            roiManager("select", (cnt-1));
+            roiManager("rename",ROI_name);
+            run("Select None");
+
+        }
+    }
+        
+
+
+    if (isKeyDown("Shift") == true) {
+        if (roiManager("Count") >= 1) {
+            File.makeDirectory(newfolderpath);
+            for (i = 0; i<roiManager("Count"); i++) {
+                roiManager("Select", i);
+                roi_name = RoiManager.getName(i);
+                roiManager("Save", newfolderpath+roi_name+".roi");
+            }
+
+            selectWindow(imname);
+            close();
+            run("Select None");
+            roiManager("show none");
+            roiManager("reset");
+            
+        }
+                
+    }
+    if (isOpen("ROI Manager")) {
+        selectWindow("ROI Manager");
+        run("Close");
+    }
+    close("*");
+
+    
+}
+
+// ****************************************************************
+

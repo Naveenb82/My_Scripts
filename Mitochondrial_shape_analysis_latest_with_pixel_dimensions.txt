@@ -1,0 +1,343 @@
+
+// Channel Selection variables
+
+var mito_channel;
+var n_channels = 1;
+
+// Automated pipeline for Mitochondrial shape analysis
+
+	var CLAHE = false;
+	var CLAHE_BLOCKSIZE = 127;
+	var CLAHE_HISTOGRAM = 256;
+	var CLAHE_MAXSLOPE = 3;
+
+	var MED = false;
+	var MED_RADIUS = 2;
+
+	var TOPHAT = false;
+	var TOPHAT_RADIUS;
+
+	var UNSHARP = false;
+	var UNSHARP_RADIUS = 2;
+	var UNSHARP_STRENGTH = 0.6;
+
+	var Tubeness_filter_sigma = 0.5;
+
+
+
+macro "MitoShape [F9]" {
+	run("Close All");
+	setUp();
+	select_channels();
+	tubeness_sigma();
+	imagepath = getDirectory("Choose directory! ");
+	imagefilelist = getFileList(imagepath);
+	pathfolderlist = split(imagepath,"\\");
+	prefixfolder = pathfolderlist[pathfolderlist.length-1];
+	//Array.show("PREFIX FOLDERS: ",prefixfolder);
+	modified_name = "original";
+	for (ii=0;ii<imagefilelist.length;ii++){
+		run("ROI Manager...");
+		if(endsWith(imagefilelist[ii],".tif")){
+
+			open(imagepath+imagefilelist[ii]);
+
+			imname = getTitle();
+			imext = indexOf(imname,".tif");
+
+			selectWindow(imname);
+			run("Duplicate...", "title="+modified_name);
+			
+			selectWindow(modified_name);
+			
+			close_channels();
+			selectWindow(modified_name+" "+"("+mito_channel+")");
+			getPixelSize(unit, pixelWidth, pixelHeight);
+			run("Set Scale...", "distance=0 known=0 unit=pixel");
+			
+
+			roifoldername = substring(imname,0,imext);
+			final = prefixfolder+roifoldername+"output";
+			//Table.create(final);
+			roifilepath = imagepath+"/"+roifoldername+"/";
+			
+			if (File.isDirectory(roifilepath) == true ) {
+				roifilelist = getFileList(roifilepath);
+				temproilist = newArray(0);
+				if (roifilelist.length !=0) {
+				
+					for (z=0;z<roifilelist.length;z++) {
+						if (endsWith(roifilelist[z],".roi")) {
+						temproilist = Array.concat(temproilist,roifilelist[z]);
+						}
+					}	
+				}
+				if (temproilist.length !=0) {
+					Table.create(final);
+					for (j=0;j<temproilist.length;j++) {
+						roiManager("Open", roifilepath+temproilist[j]);
+
+						roi = temproilist[j];
+						//print("ROI name : "+roi);
+						roiext = indexOf(roi,".roi");
+						roiname = substring(roi,0,roiext);
+						prefix = prefixfolder+"##"+roifoldername+"##"+roiname;
+					
+						selectWindow(modified_name+" "+"("+mito_channel+")");
+						roiManager("Select",j);
+			
+
+
+
+					
+
+						//Duplicate region of interest and collect general information
+				    	showStatus("MitoShape: Getting image information...");
+						run("Duplicate...", "title=Original");
+						selectWindow("Original");
+						run("Clear Outside");
+						selectWindow("Original");
+						roiManager("Show None");
+					
+						//getDimensions(width, height, channels, slices, frames);
+						
+						
+
+						//Preprocess image
+						preprocessing();
+
+						//Produce binary duplicate image for skeleton and binary outline...
+						showStatus("MitoShape: Applying tubeness filter");
+						
+						
+						run("Tubeness", "sigma="+toString(Tubeness_filter_sigma)+" use");
+					
+						run("Make Binary");
+						run("Set Measurements...", "area perimeter fit shape feret's redirect=None decimal=3");
+					
+						roiManager("Select", j);
+						run("Analyze Particles...", "display clear");
+					
+
+					
+				    	//Extract relevant result table
+						close("Original");
+						close("tubeness of Original");
+						if (isOpen("Results")) {
+
+							selectWindow("Results"); rows = nResults;
+							ObjectArea = newArray(rows);
+							ObjectPerimeter = newArray(rows);
+							ObjectFeretDiameter = newArray(rows);
+							ObjectAspectRatio = newArray(rows);
+							pixelWidtharray = newArray(rows);
+							pixelHeightarray = newArray(rows);
+							pixelunitarray = newArray(rows);
+							for (i=0; i<rows; i++) {
+								ObjectArea[i] = getResult("Area", i);
+								ObjectPerimeter[i] = getResult("Perim.", i);
+								ObjectFeretDiameter[i] = getResult("Feret", i);
+								ObjectAspectRatio[i] = getResult("AR", i);
+								pixelWidtharray[i] = pixelWidth;
+								pixelHeightarray[i] = pixelHeight;
+								pixelunitarray[i] = unit;
+							}
+							
+							
+
+							// Calculate Formfactor
+
+							ObjectFormFactor = newArray(rows);
+							for (d=0;d<rows;d++) {
+								ObjectFormFactor[d] = (pow(ObjectPerimeter[d],2.0))/(4*PI*ObjectArea[d]);
+							}
+							selectWindow("Results"); run("Close");
+							// Add ObjectID array
+							ObjectID = newArray(rows);
+							for (f=0;f<rows;f++) {
+								ObjectID[f] = prefix+"&#"+(f+1);
+							}
+						
+
+						
+							Array.show("MitoShape Output", ObjectID, ObjectArea, ObjectPerimeter, ObjectFormFactor, ObjectAspectRatio, ObjectFeretDiameter, pixelWidtharray, pixelHeightarray, pixelunitarray);
+
+
+							table1 ="temp";
+							Table.rename("MitoShape Output", table1);
+					
+							head = split(Table.headings(table1));
+							nrows_final = Table.size(final);
+							if (nrows_final==0) {
+								for (col =0;col<head.length;col++) {
+									tc = Table.getColumn(head[col],table1);
+						
+									Table.setColumn(head[col],tc,final);
+								}
+								Table.update(final);
+								close(table1);
+							}
+							else {
+								for (col =0;col<head.length;col++) {
+									tc = Table.getColumn(head[col],table1);
+									tc1 = Table.getColumn(head[col],final);
+									tcf = Array.concat(tc1,tc);
+									Table.setColumn(head[col],tcf,final);
+								}
+							Table.update(final);
+							close(table1);
+							}
+						}
+									
+					}
+					selectWindow(modified_name+" "+"("+mito_channel+")");
+					close();
+					selectWindow("ROI Manager");
+					roiManager("reset");
+					run("Close");
+
+
+				}
+				Table.save(imagepath+prefixfolder+"_"+roifoldername+"_MitoShape_result.csv", final);
+				close(final);
+
+			}
+			else {
+				close("*");
+			}
+			
+			
+			
+		}
+
+	}
+	//Table.save(imagepath+prefixfolder+"_MitoShape_result.csv", final);
+
+	if (isOpen("ROI Manager")) {
+		selectWindow("ROI Manager");
+		run("Close");
+	}
+	
+	close("*");
+}
+
+
+
+
+// ****************************************************************
+function select_channels () {
+	Dialog.create ("Select Channel");
+	Dialog.addMessage ("Select channel used for mitochondrial imaging");
+	Dialog.addNumber ("No. of channels used for imaging", 1);
+	Dialog.addChoice ("Mitochondrial channel", newArray("blue", "green", "red"));	
+	Dialog.show();
+
+	n_channels = Dialog.getNumber();
+	mito_channel = Dialog.getChoice();
+
+}
+
+// ****************************************************************
+
+
+// ****************************************************************
+function close_channels() {
+	if (n_channels >1) {
+		selectWindow(modified_name);
+		run("Split Channels");
+		selectWindow (modified_name+" "+"("+mito_channel+")");
+		close("\\Others");
+	}
+	else {
+		selectWindow(modified_name);
+		rename(modified_name+" "+"("+mito_channel+")");
+		run("8-bit");
+
+	}
+
+}
+
+// ****************************************************************
+
+
+// ****************************************************************
+//Preprocessing set up GUI...
+function setUp() {
+	//Produce GUI to set preprocessing preferences
+    Dialog.create("Preprocessing");
+    Dialog.addMessage("Processing to Apply");
+    Dialog.addCheckbox("CLAHE", false);
+	Dialog.addSlider("Blocksize: ", 1, 256, 127);
+	Dialog.addSlider("Histogram Bins: ", 1, 256, 256);
+	Dialog.addSlider("Maximum Slope: ", 0, 10, 3);
+	Dialog.addCheckbox("Median Filter", false);
+	Dialog.addSlider("Radius: ", 0, 20, 2);
+	Dialog.addCheckbox("Unsharp Mask", false);
+	Dialog.addSlider("Radius: ", 0, 20, 2);
+	Dialog.addSlider("Mask Strength: ", 0, 0.9, 0.6);
+	Dialog.addCheckbox("Tophat (Iannetti et al., 2016)" , false);
+	Dialog.addNumber ("Radius", 1);
+
+
+    Dialog.show();
+
+	CLAHE = Dialog.getCheckbox();
+	CLAHE_BLOCKSIZE = Dialog.getNumber();
+	CLAHE_HISTOGRAM = Dialog.getNumber();
+	CLAHE_MAXSLOPE = Dialog.getNumber();
+
+	MED = Dialog.getCheckbox();
+	MED_RADIUS = Dialog.getNumber();
+
+	UNSHARP = Dialog.getCheckbox();
+	UNSHARP_RADIUS = Dialog.getNumber();
+	UNSHARP_STRENGTH = Dialog.getNumber();
+	TOPHAT = Dialog.getCheckbox();
+	TOPHAT_RADIUS = Dialog.getNumber();
+}
+
+// ****************************************************************
+
+// ****************************************************************
+//Preprocessing set up GUI...
+function tubeness_sigma() {
+	
+    Dialog.create("Tubeness....");
+    Dialog.addMessage("Select sigma for Tubeness filter");
+    Dialog.addNumber ("Sigma", 1);
+    
+    Dialog.show();
+
+	Tubeness_filter_sigma = Dialog.getNumber();
+}
+
+// ****************************************************************
+
+// ****************************************************************
+
+//Preprocessing...
+function preprocessing() {
+
+	//Apply unsharp mask to image if selected
+	selectWindow("Original");
+	if (UNSHARP == true) {
+		run("Unsharp Mask...", "radius="+toString(UNSHARP_RADIUS)+" mask="+toString(UNSHARP_STRENGTH));
+	}
+
+    //Apply contrast limited adaptive histogram equalization if selected
+	if (CLAHE == true) {
+		run("Enhance Local Contrast (CLAHE)",
+                    "blocksize="+toString(CLAHE_BLOCKSIZE)+" histogram="+toString(CLAHE_HISTOGRAM)+" maximum="+toString(CLAHE_MAXSLOPE)+" mask=*None* fast_(less_accurate)");
+	}
+
+    //Apply median filtering if selected
+	if (MED == true) {
+		run("Median...", "radius="+toString(MED_RADIUS));
+	}
+
+	//Apply tophat filter if selected
+	if (TOPHAT == true) {
+		run("Top Hat...", "radius="+toString(TOPHAT_RADIUS));
+	}
+}
+// ****************************************************************

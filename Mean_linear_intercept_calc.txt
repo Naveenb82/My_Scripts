@@ -1,0 +1,149 @@
+	////////////////////////////////////////////////////////////////////////////////
+	//////////////Macro for calculation of Mean linear intercept (Lm) /////////////
+	/////////////////////////////////////////////////////////////////////////////
+
+
+var n_lines = 32;
+
+macro "Mean linear intercept [F9]" {
+	if (isOpen("Results")) {
+		selectWindow("Results");
+		run("Close");
+	}
+	setup();
+	
+	imagepath = getDirectory("Choose directory! ");
+	t = getTime();
+	imagefilelist = getFileList(imagepath);
+	pathfolderlist = split(imagepath,"\\");
+	prefixfolder = pathfolderlist[pathfolderlist.length-1];
+
+	for (h =0;h<imagefilelist.length;h++) {
+		if (endsWith(imagefilelist[h],".tif") || endsWith(imagefilelist[h],".jpg")) {
+			open(imagepath+imagefilelist[h]);
+			imname = getTitle();
+			imext = indexOf(imname,".tif");
+			Horizontal_line_MLI (n_lines);
+		}
+	}
+
+	saveAs("Results",imagepath+prefixfolder+"_"+"horizontal_chord_lengths.csv");
+	if (isOpen("Results")) {
+		selectWindow("Results");
+		run("Close");
+	}
+	for (v =0;v<imagefilelist.length;v++) {
+		if (endsWith(imagefilelist[v],".tif") || endsWith(imagefilelist[v],".jpg")) {
+			open(imagepath+imagefilelist[v]);
+			imname = getTitle();
+			imext = indexOf(imname,".tif");
+			Vertical_line_MLI (n_lines);
+		}
+	}
+	saveAs("Results",imagepath+prefixfolder+"_"+"vertical_chord_lengths.csv");
+	if (isOpen("Results")) {
+		selectWindow("Results");
+		run("Close");
+	}
+	close("*");
+	print("time elapsed for", imagefilelist.length,"is:", getTime()-t);
+}
+
+
+// ....................................................
+function Horizontal_line_MLI (n_lines) {
+	if (n_lines==0){
+		n_lines=32;
+		print("Number of lines should be greater than 0. 
+			Therefore, default value 32 is considered.")
+	}
+	selectWindow(imname);
+	height = getHeight;
+	line_gap = height/n_lines;
+	areaperpoint = Math.round(Math.sqr(line_gap));
+	img1 = "original";
+	run("Duplicate...", "title="+img1);
+	selectWindow(imname);
+	close();
+	selectWindow("original");
+	run("8-bit");
+	run("Auto Threshold", "method=Huang black");
+	run("Grid...", "grid=[Horizontal Lines] area="+areaperpoint+" color=White");
+	run("Flatten");
+	selectWindow(img1);
+	run("Remove Overlay");
+	img2 = img1+"-1";
+	imageCalculator("Difference ", img2,img1);
+	selectWindow(img1);
+	close();
+	new_name = prefixfolder+"_"+imname;
+	selectWindow(img2);
+	rename(new_name+"&#H");
+	img2 = new_name+"&#H";
+	selectWindow(img2);
+	run("Convert to Mask");
+	run("Set Measurements...", "bounding display redirect=None decimal=3");
+	run("Analyze Particles...", "display exclude");
+	selectWindow(img2);
+	close();
+}
+// ......................................................
+
+// ......................................................
+
+function Vertical_line_MLI (n_lines) {
+	selectWindow(imname);
+	run("Rotate 90 Degrees Right");
+	height = getHeight;
+	line_gap = height/n_lines;
+	areaperpoint = Math.round(Math.sqr(line_gap));
+	img1 = "original";
+	run("Duplicate...", "title=" + "original");
+	selectWindow(imname);
+	close();
+	selectWindow("original");
+	run("8-bit");
+	run("Auto Threshold", "method=Huang black");
+	run("Grid...", "grid=[Horizontal Lines] area="+areaperpoint+" color=White");
+	run("Flatten");
+	img2 = img1+"-1";
+	selectWindow(img1);
+	run("Remove Overlay");
+	run("Rotate 90 Degrees Left");
+	selectWindow(img2);
+	run("Rotate 90 Degrees Left");
+	imageCalculator("Difference ", img2,img1);
+	selectWindow(img1);
+	close();
+	new_name = prefixfolder+"_"+imname;
+	selectWindow(img2);
+	rename(new_name+"&#V");
+	img2 = new_name+"&#V";
+	selectWindow(img2);
+	run("Convert to Mask");
+	run("Set Measurements...", "bounding display redirect=None decimal=3");
+	run("Analyze Particles...", "display exclude");
+	selectWindow(img2);
+	close();
+}
+// ......................................................
+
+
+// ......................................................
+
+function setup() {
+	Dialog.create ("Choose Number of lines");
+	
+	Dialog.addNumber ("No. of lines:",32);
+	
+	
+
+	Dialog.show();
+
+	
+	n_lines = Dialog.getNumber();
+	
+}
+
+// ......................................................
+

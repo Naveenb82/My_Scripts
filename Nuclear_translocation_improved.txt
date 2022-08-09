@@ -1,0 +1,502 @@
+var tot_areaArray = newArray;
+var tot_raw_intdenArray_C2 = newArray;
+var tot_raw_intdenArray_C3 = newArray;
+var tot_raw_intdenArray_C4 = newArray;
+var	Nu_areaArray = newArray;
+var	cyto_areaArray = newArray;
+var	Nucleus_raw_intdenArray_C2 = newArray;
+var	Nucleus_raw_intdenArray_C3 = newArray;
+var	Nucleus_raw_intdenArray_C4 = newArray;
+var	Cell_idArray = newArray;
+var	Cyto_raw_intdenArray_C2 = newArray;
+var	Cyto_raw_intdenArray_C3 = newArray;
+var	Cyto_raw_intdenArray_C4 = newArray;
+var Px_widthArray = newArray;
+var Px_heightArray = newArray;
+var Px_unitArray = newArray;
+var order = newArray;
+var ch_pos = newArray;
+
+
+macro "Nuclear_translocation [F9]" {
+	Channel_positions();
+	
+	
+	t = getTime();
+	setBackgroundColor(0, 0, 0);
+	setOption("BlackBackground", true);
+	setOption("ExpandableArrays", true);
+	run("Close All");
+	if (isOpen("ROI Manager")) {
+		roiManager("reset");
+		selectWindow("ROI Manager");
+        run("Close");
+    }
+	
+
+    imagepath = getDirectory("Choose directory containing Images:");
+    //setup();
+	
+	imfilelist = getFileList(imagepath);
+	pathfolderlist = split(imagepath,File.separator);
+	prefixfolder = pathfolderlist[pathfolderlist.length-1];
+	print("Macro running folder: "+prefixfolder);
+	//run("Set Measurements...", "area integrated redirect=None decimal=3");
+	setBatchMode(true);
+	for (i=0;i<imfilelist.length;i++) {
+
+		image = imfilelist[i];
+		Nuclear_translocation(imfilelist[i]);
+	}
+	setBatchMode("exit & display");
+	if (order.length ==2) {
+		Table.showArrays("Output", Cell_idArray, Px_widthArray, Px_heightArray, Px_unitArray, tot_areaArray,tot_raw_intdenArray_C2,Nu_areaArray,Nucleus_raw_intdenArray_C2,cyto_areaArray,Cyto_raw_intdenArray_C2);
+	}
+	else if (order.length ==3) {
+		Table.showArrays("Output", Cell_idArray, Px_widthArray, Px_heightArray, Px_unitArray, tot_areaArray,tot_raw_intdenArray_C2,tot_raw_intdenArray_C3,Nu_areaArray,Nucleus_raw_intdenArray_C2,Nucleus_raw_intdenArray_C3,cyto_areaArray,Cyto_raw_intdenArray_C2, Cyto_raw_intdenArray_C3);
+	
+	}
+	else if (order.length ==4) {
+		Table.showArrays("Output", Cell_idArray, Px_widthArray, Px_heightArray, Px_unitArray, tot_areaArray,tot_raw_intdenArray_C2,tot_raw_intdenArray_C3,tot_raw_intdenArray_C4,Nu_areaArray,Nucleus_raw_intdenArray_C2,Nucleus_raw_intdenArray_C3,Nucleus_raw_intdenArray_C4,cyto_areaArray,Cyto_raw_intdenArray_C2,Cyto_raw_intdenArray_C3,Cyto_raw_intdenArray_C4);
+	
+	}	
+	output_path = imagepath+"output"+File.separator;
+	if (File.isDirectory(output_path) == false) {
+		File.makeDirectory(output_path);
+	}
+	Table.save(output_path+prefixfolder+"_"+"output.csv", "Output");
+	close("Output");
+	close("*");
+	if (isOpen("ROI Manager")) {
+		selectWindow("ROI Manager");
+		run("Close");
+	}
+	if (isOpen("Results")) {
+		selectWindow("Results");
+		run("Close");
+	}
+
+		
+	
+	print("time elapsed is:", getTime()-t);
+	//run("Collect Garbage");
+	run("Close All");
+	tot_areaArray = newArray;
+	tot_raw_intdenArray_C2 = newArray;
+	tot_raw_intdenArray_C3 = newArray;
+	tot_raw_intdenArray_C4 = newArray;
+	Nu_areaArray = newArray;
+	cyto_areaArray = newArray;
+	Nucleus_raw_intdenArray_C2 = newArray;
+	Nucleus_raw_intdenArray_C3 = newArray;
+	Nucleus_raw_intdenArray_C4 = newArray;
+	Cell_idArray = newArray;
+	Cyto_raw_intdenArray_C2 = newArray;
+	Cyto_raw_intdenArray_C3 = newArray;
+	Cyto_raw_intdenArray_C4 = newArray;
+	Px_widthArray = newArray;
+	Px_heightArray = newArray;
+	Px_unitArray = newArray;
+	order = newArray;
+	ch_pos = newArray;
+	print("run complete... for folder: "+prefixfolder);
+}
+
+
+
+// ......................................................
+
+function Nuclear_translocation(image) {
+	dim_unit = newArray;
+	px_wd = newArray;
+	px_ht = newArray;
+    Cell_id = newArray;
+	Nu_area = newArray;
+	Nu_rawInt_C2 = newArray;
+	Nu_rawInt_C3 = newArray;
+	Nu_rawInt_C4 = newArray;
+	total_cell_area = newArray;
+	
+	total_cell_rawInt_C2 = newArray;
+	total_cell_rawInt_C3 = newArray;
+	total_cell_rawInt_C4 = newArray;
+	cyt_area = newArray;
+	cyt_rawInt_C2 = newArray;
+	cyt_rawInt_C3 = newArray;
+	cyt_rawInt_C4 = newArray;
+
+	run("ROI Manager...");
+
+	if (endsWith(image, "tif")) {
+		open(imagepath+image);
+		stained_channels();
+		imname = getTitle();
+		selectWindow(imname);
+		
+		getPixelSize(unit, pixelWidth, pixelHeight);
+		run("Set Scale...", "distance=0 known=0 unit=pixel");
+		//print("Name:",imname);
+		field_id = File.nameWithoutExtension;
+		
+		prefix = prefixfolder+"##"+field_id+"##";
+		retain_cytoplasm_channel(imname);
+		
+
+
+		cellmask = "C2-Original";
+		selectWindow(cellmask);
+		run("8-bit");
+		run("Enhance Local Contrast (CLAHE)", "blocksize=151 histogram=256 maximum=3 mask=*None*");
+		//run("Minimum...", "radius=3");
+		run("Median...", "radius=3");
+		run("Auto Threshold", "method=Huang white");
+		run("Fill Holes");
+		run("Analyze Particles...", "size=4000-Infinity exclude clear add");
+			//wait(5000);
+		selectWindow(cellmask);
+		close();
+
+		cnt = roiManager("count");
+		//print("Count:",cnt);
+		//roiManager("Deselect");
+		//roiManager("Select", 0);
+		//print("check:", RoiManager.selected);
+			
+		//wait(3000);
+
+		if (cnt>0) {
+			for (j=0;j<cnt;j++) {
+				//print("ROI:", j);
+				ROI_path = imagepath+"ROI"+File.separator;
+				if (File.isDirectory(ROI_path) == false) {
+					File.makeDirectory(ROI_path);
+				}
+				//roiManager("Show None");
+				roi_id = field_id+"##"+toString(j+1);
+				roiManager("Select",j);
+				roiManager("Save", ROI_path+roi_id+".roi");					
+				//roiManager("Deselect");
+				selectWindow(imname);
+					
+					
+					
+				//wait(3000);
+				roiManager("Select",j);
+				roi = "roi";
+				run("Duplicate...", "title=roi duplicate");
+				//wait(3000);
+				//selectWindow("roi");
+				run("Clear Outside", "stack");
+				roiManager("Add");
+				roiManager("Show None");
+									
+				//wait(1000);
+				run("Split Channels");
+				selectWindow("C1-roi");
+				run("8-bit");
+				//run("Select None");
+				//wait(3000);
+				run("Enhance Local Contrast (CLAHE)", "blocksize=127 histogram=256 maximum=3 mask=*None*");
+				run("Median...", "radius=3");
+				run("Auto Threshold", "method=Huang white");
+				run("Fill Holes");
+				//wait(2000);
+					
+				run("Create Selection");
+				selectWindow("C2-roi");
+				run("8-bit");
+				selectWindow("C2-roi");	
+				//roiManager("Show None");
+				run("Restore Selection");
+				//wait(10000);
+				//List.clear;
+				//List.setMeasurements;
+
+				//selectWindow("Results");
+					
+				if (getValue ("Area") > 500) {
+					
+					dim_unit[j] = unit;
+					px_wd[j] = pixelWidth;
+					px_ht[j] = pixelHeight;
+					Cell_id[j] = prefix+toString(j+1);
+					Nu_area[j] = getValue ("Area");
+						
+					Nu_rawInt_C2[j] = getValue ("RawIntDen");
+					
+					if (order.length == 3) {
+						selectWindow("C3-roi");
+						run("8-bit");
+						selectWindow("C3-roi");
+						run("Restore Selection");
+						Nu_rawInt_C3[j] = getValue ("RawIntDen");
+					}
+					if (order.length == 4) {
+						selectWindow("C3-roi");
+						run("8-bit");
+						selectWindow("C3-roi");
+						run("Restore Selection");
+						Nu_rawInt_C3[j] = getValue ("RawIntDen");
+
+						selectWindow("C4-roi");
+						run("8-bit");
+						selectWindow("C4-roi");
+						run("Restore Selection");
+						Nu_rawInt_C4[j] = getValue ("RawIntDen");
+					}	
+						
+					selectWindow("C2-roi");
+					
+					//run("Select None");
+					roiManager("Select",cnt);
+					//List.clear;
+					//List.setMeasurements;
+						
+					total_cell_area[j] = getValue("Area");
+					//print("Values:", roi_id, total_cell_area[j]);
+					total_cell_rawInt_C2[j] = getValue("RawIntDen");
+					
+					cyt_area[j] = total_cell_area[j] - Nu_area[j];
+					cyt_rawInt_C2[j] = total_cell_rawInt_C2[j] - Nu_rawInt_C2[j];
+					
+					if (order.length == 3) {
+						selectWindow("C3-roi");
+						
+						roiManager("Select",cnt);
+						total_cell_rawInt_C3[j] = getValue("RawIntDen");
+						cyt_rawInt_C3[j] = total_cell_rawInt_C3[j] - Nu_rawInt_C3[j];
+					}
+					if (order.length == 4) {
+						selectWindow("C3-roi");
+						
+						roiManager("Select",cnt);
+						total_cell_rawInt_C3[j] = getValue("RawIntDen");
+						cyt_rawInt_C3[j] = total_cell_rawInt_C3[j] - Nu_rawInt_C3[j];
+
+						selectWindow("C4-roi");
+						
+						roiManager("Select",cnt);
+						total_cell_rawInt_C4[j] = getValue("RawIntDen");
+						cyt_rawInt_C4[j] = total_cell_rawInt_C4[j] - Nu_rawInt_C4[j];
+					}
+						
+					close("*-roi");
+					roiManager("Select",cnt);
+					roiManager("Delete");
+									
+				}
+				else {
+					dim_unit[j] = unit;
+					px_wd[j] = pixelWidth;
+					px_ht[j] = pixelHeight;
+					Cell_id[j] = prefix+toString(j+1);
+					Nu_area[j] = 0;
+						
+					Nu_rawInt_C2[j] = 0;
+					if (order.length == 3) {
+						Nu_rawInt_C3[j] = 0;
+					}
+					if (order.length == 4) {
+						Nu_rawInt_C3[j] = 0;
+						Nu_rawInt_C4[j] = 0;
+					}
+					
+					selectWindow("C2-roi");
+					run("8-bit");
+					//run("Select None");
+					roiManager("Select",cnt);
+					//List.clear;
+					//List.setMeasurements;
+						
+					total_cell_area[j] = getValue("Area");
+					//print("Values:", roi_id, total_cell_area[j]);
+					total_cell_rawInt_C2[j] = getValue("RawIntDen");
+					
+					cyt_area[j] = total_cell_area[j] - Nu_area[j];
+					cyt_rawInt_C2[j] = total_cell_rawInt_C2[j] - Nu_rawInt_C2[j];
+					if (order.length == 3) {
+						selectWindow("C3-roi");
+						run("8-bit");
+						roiManager("Select",cnt);
+						total_cell_rawInt_C3[j] = getValue("RawIntDen");
+						cyt_rawInt_C3[j] = total_cell_rawInt_C3[j] - Nu_rawInt_C3[j];
+					}
+					if (order.length == 4) {
+						selectWindow("C3-roi");
+						run("8-bit");
+						roiManager("Select",cnt);
+						total_cell_rawInt_C3[j] = getValue("RawIntDen");
+						cyt_rawInt_C3[j] = total_cell_rawInt_C3[j] - Nu_rawInt_C3[j];
+						selectWindow("C3-roi");
+						close();
+						selectWindow("C4-roi");
+						run("8-bit");
+						roiManager("Select",cnt);
+						total_cell_rawInt_C4[j] = getValue("RawIntDen");
+						cyt_rawInt_C4[j] = total_cell_rawInt_C4[j] - Nu_rawInt_C4[j];
+					}
+
+					close("*-roi");
+					roiManager("Select",cnt);
+					roiManager("Delete");
+				}
+
+			}
+			roiManager("reset");
+			//run("Close");
+		}
+
+
+	}
+	Cell_idArray = Array.concat(Cell_idArray,Cell_id);
+	Px_widthArray = Array.concat(Px_widthArray, px_wd);
+	Px_heightArray = Array.concat(Px_heightArray,px_ht);
+	Px_unitArray = Array.concat(Px_unitArray,dim_unit);
+	tot_areaArray = Array.concat(tot_areaArray,total_cell_area);
+	Nu_areaArray = Array.concat(Nu_areaArray,Nu_area);
+	cyto_areaArray = Array.concat(cyto_areaArray,cyt_area);
+	
+	tot_raw_intdenArray_C2 = Array.concat(tot_raw_intdenArray_C2,total_cell_rawInt_C2);
+	Nucleus_raw_intdenArray_C2 = Array.concat(Nucleus_raw_intdenArray_C2, Nu_rawInt_C2);
+	Cyto_raw_intdenArray_C2 = Array.concat(Cyto_raw_intdenArray_C2, cyt_rawInt_C2);
+	if (order.length ==3) {
+		tot_raw_intdenArray_C3 = Array.concat(tot_raw_intdenArray_C3,total_cell_rawInt_C3);
+		Nucleus_raw_intdenArray_C3 = Array.concat(Nucleus_raw_intdenArray_C3, Nu_rawInt_C3);
+		Cyto_raw_intdenArray_C3 = Array.concat(Cyto_raw_intdenArray_C3, cyt_rawInt_C3);
+	}
+	if (order.length ==4) {
+		tot_raw_intdenArray_C3 = Array.concat(tot_raw_intdenArray_C3,total_cell_rawInt_C3);
+		tot_raw_intdenArray_C4 = Array.concat(tot_raw_intdenArray_C4,total_cell_rawInt_C4);
+		Nucleus_raw_intdenArray_C3 = Array.concat(Nucleus_raw_intdenArray_C3, Nu_rawInt_C3);
+		Nucleus_raw_intdenArray_C4 = Array.concat(Nucleus_raw_intdenArray_C4, Nu_rawInt_C4);
+		Cyto_raw_intdenArray_C3 = Array.concat(Cyto_raw_intdenArray_C3, cyt_rawInt_C3);
+		Cyto_raw_intdenArray_C4 = Array.concat(Cyto_raw_intdenArray_C4, cyt_rawInt_C4);
+	}
+	
+	
+}
+
+// ......................................................
+
+
+// ......................................................
+
+function Channel_positions () {
+	setOption("ExpandableArrays", true);
+	positions = newArray;
+	entities = newArray("nucleus","cytoplasm/protein_1", "protein_2", "protein_3", "Bright_field");
+	pos = Array.getSequence(entities.length+1);
+	for (g = 0;g < pos.length; g++) {
+		positions[g] = d2s(pos[g],0);
+	}
+	Dialog.create ("Select Channel positions as in the order they appear \n in the image  for all the stained sub-cellular entities:");
+	for (k = 0; k < entities.length; k++) {
+		Dialog.addRadioButtonGroup(entities[k], positions, 1, positions.length, "0");
+	}
+	Dialog.addMessage ("Note1: Select ZERO if the channel is not present in your images.")
+	Dialog.show();
+	
+	for (m = 0;m < entities.length; m++) {
+		ch_pos[m] = parseInt(Dialog.getRadioButton());
+	}
+}
+
+// ......................................................
+
+function stained_channels() {
+	setOption("ExpandableArrays", true);
+	cn = 0;
+	
+	for (a=0; a < ch_pos.length; a++) {
+		if (ch_pos[a] > 0) {
+			order[cn] = ch_pos[a];
+			cn = cn+1;
+			
+		}
+	}
+
+	if (cn == 0) {
+		exit("None of the channels selected!");
+	}
+	else {
+		if (ch_pos[0] == 0) {
+		exit ("Nuclear staining is essential for assessing nuclear localization");
+		}
+		if (cn == 1) {
+			exit ("Nuclear localization requires at least one protein of interest stained other than nucleus");
+		}
+
+		else if (cn == 2 ) {
+			if (ch_pos[4] > 0) {
+				exit("Nuclear localization requires at least one protein of interest stained other than nucleus");
+			}
+		}
+		else {
+			if (ch_pos[4] > 0) {
+				for (n = 0; n < order.length-1; n++) {
+					if (n == 0) {
+						new_pos = d2s(order[n],0);
+					}
+					else {
+						new_pos = new_pos+d2s(order[n],0);
+					}
+				}
+				order = Array.deleteIndex(order, order.length-1);
+			}
+			else {
+				for (n = 0; n < order.length; n++) {
+					if (n == 0) {
+						new_pos = d2s(order[n],0);
+					}
+					else {
+						new_pos = new_pos+d2s(order[n],0);
+					}
+				}
+			}
+			
+
+			run("Arrange Channels...", "new="+new_pos);
+			//print("Proceeding for data anlysis....");
+		}
+	}
+}
+    
+// ......................................................
+
+
+// ......................................................
+
+function retain_cytoplasm_channel(imname) {
+
+
+	selectWindow(imname);
+
+	run("Duplicate...", "title=Original duplicate");
+	selectWindow("Original");
+	run("Split Channels");
+	if (order.length ==2) {
+		selectWindow("C1-Original");
+		close();
+	}
+	else if (order.length == 3) {
+		selectWindow("C1-Original");
+		close();
+		selectWindow("C3-Original");
+		close();
+	}
+	else if (order.length == 4) {
+		selectWindow("C1-Original");
+		close();
+		selectWindow("C3-Original");
+		close();
+		selectWindow("C4-Original");
+		close();
+	}
+	
+}
+
+// ......................................................
+
+
+
+
