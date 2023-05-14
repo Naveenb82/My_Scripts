@@ -1,0 +1,192 @@
+var Cell_areaArray = newArray;
+var Organelle_raw_intdenArray = newArray;
+var	Cell_idArray = newArray;
+var Px_widthArray = newArray;
+var Px_heightArray = newArray;
+var Px_unitArray = newArray;
+
+var organelle_channel;
+var n_channels = 1;
+
+var CLAHE = false;
+var CLAHE_BLOCKSIZE = 127;
+var CLAHE_HISTOGRAM = 256;
+var CLAHE_MAXSLOPE = 3;
+var MED = false;
+var MED_RADIUS = 2;
+var TOPHAT = false;
+var TOPHAT_RADIUS;
+
+var UNSHARP = false;
+var UNSHARP_RADIUS = 2;
+var UNSHARP_STRENGTH = 0.6;
+
+
+macro "Organelle_intensity_measure [F9]" {
+	t = getTime();
+	setBackgroundColor(0, 0, 0);
+	setOption("BlackBackground", true);
+	setOption("ExpandableArrays", true);
+	run("Close All");
+	if (isOpen("ROI Manager")) {
+		roiManager("reset");
+		selectWindow("ROI Manager");
+        run("Close");
+    }
+	//setUp();
+	select_channels();
+	imagepath = getDirectory("Choose directory! ");
+	imagefilelist = getFileList(imagepath);
+	pathfolderlist = split(imagepath,"\\");
+	prefixfolder = pathfolderlist[pathfolderlist.length-1];
+	print("Macro running folder: "+prefixfolder);
+	for (i=0;i<imagefilelist.length;i++) {
+
+		image = imagefilelist[i];
+		Measure_intensity(imagefilelist[i]);
+	}
+	setBatchMode("exit & display");
+	Table.showArrays("Output", Cell_idArray, Px_widthArray, Px_heightArray, Px_unitArray, Cell_areaArray,Organelle_raw_intdenArray);
+	output_path = imagepath+"output"+File.separator;
+	if (File.isDirectory(output_path) == false) {
+		File.makeDirectory(output_path);
+	}
+	Table.save(output_path+prefixfolder+"_"+"output.csv", "Output");
+	close("Output");
+	close("*");
+	if (isOpen("ROI Manager")) {
+		selectWindow("ROI Manager");
+		run("Close");
+	}
+	if (isOpen("Results")) {
+		selectWindow("Results");
+		run("Close");
+	}
+
+		
+	
+	print("time elapsed is:", getTime()-t);
+	run("Close All");
+	Cell_areaArray = newArray;
+	Organelle_raw_intdenArray = newArray;
+	Cell_idArray = newArray;
+	Px_widthArray = newArray;
+	Px_heightArray = newArray;
+	Px_unitArray = newArray;
+	print("run complete... for folder: "+prefixfolder);
+}
+
+
+
+
+// ......................................................
+
+function Measure_intensity(image) {
+	dim_unit = newArray;
+	px_wd = newArray;
+	px_ht = newArray;
+    Cell_id = newArray;
+	Cell_area = newArray;
+	Cell_rawintden = newArray;
+	
+
+	run("ROI Manager...");
+	modified_name = "original";
+	if (endsWith(image, "tif")) {
+		open(imagepath+image);
+		imname = getTitle();
+		imext = indexOf(imname,".tif");
+
+		selectWindow(imname);
+		run("Duplicate...", "title="+modified_name);
+		
+		selectWindow(modified_name);
+		
+		close_channels();
+		selectWindow(modified_name+" "+"("+organelle_channel+")");
+		getPixelSize(unit, pixelWidth, pixelHeight);
+		run("Set Scale...", "distance=0 known=0 unit=pixel");
+			
+
+		roifoldername = substring(imname,0,imext);
+		//final = prefixfolder+roifoldername+"output";
+		//Table.create(final);
+		roifilepath = imagepath+"/"+roifoldername+"/";
+		if (File.isDirectory(roifilepath) == true) {
+			roifilelist = getFileList(roifilepath);
+			temproilist = newArray(0);
+			if (roifilelist.length !=0) {
+				
+				for (z=0;z<roifilelist.length;z++) {
+					if (endsWith(roifilelist[z],".roi")) {
+						temproilist = Array.concat(temproilist,roifilelist[z]);
+					}
+				}
+				if (temproilist.length !=0) {
+					for (j=0;j<temproilist.length; j++) {
+						roiManager("Open", roifilepath+temproilist[j]);
+					}
+					for (r=0;r<temproilist.length; r++) {
+						roi = temproilist[r];
+						//print("ROI name : "+roi);
+						roiext = indexOf(roi,".roi");
+						roiname = substring(roi,0,roiext);
+						prefix = prefixfolder+"##"+roifoldername+"##";
+					
+						selectWindow(modified_name+" "+"("+organelle_channel+")");
+						px_wd[r] = pixelWidth;
+						px_ht[r] = pixelHeight;
+						dim_unit[r] = unit;
+						Cell_id[r] = prefix+toString(r+1);
+						roiManager("Select",r);
+						Cell_area[r] = getValue ("Area");
+						roiManager("Select",r);
+						Cell_rawintden[r] = getValue("RawIntDen");
+
+
+					}
+					Cell_idArray = Array.concat(Cell_idArray,Cell_id);
+					Px_widthArray = Array.concat(Px_widthArray, px_wd);
+					Px_heightArray = Array.concat(Px_heightArray,px_ht);
+					Px_unitArray = Array.concat(Px_unitArray,dim_unit);
+					Cell_areaArray = Array.concat(Cell_areaArray,Cell_area);
+					Organelle_raw_intdenArray = Array.concat(Organelle_raw_intdenArray,Cell_rawintden);
+
+				}
+					
+			}
+		}
+	}
+}
+
+// ......................................................
+
+
+
+// ****************************************************************
+function select_channels () {
+	Dialog.create ("Select Channel");
+	Dialog.addMessage ("Select channel used for mitochondrial imaging");
+	Dialog.addNumber ("No. of channels used for imaging", 1);
+	Dialog.addChoice ("Organelle channel", newArray("blue", "green", "red"));	
+	Dialog.show();
+
+	n_channels = Dialog.getNumber();
+	organelle_channel = Dialog.getChoice();
+
+}
+
+// ****************************************************************
+
+
+// ****************************************************************
+function close_channels() {
+	selectWindow(modified_name);
+	run("Split Channels");
+	selectWindow (modified_name+" "+"("+organelle_channel+")");
+	close("\\Others");
+}
+
+// ****************************************************************
+
+
