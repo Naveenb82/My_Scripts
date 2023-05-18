@@ -8,19 +8,6 @@ var Px_unitArray = newArray;
 var organelle_channel;
 var n_channels = 1;
 
-var CLAHE = false;
-var CLAHE_BLOCKSIZE = 127;
-var CLAHE_HISTOGRAM = 256;
-var CLAHE_MAXSLOPE = 3;
-var MED = false;
-var MED_RADIUS = 2;
-var TOPHAT = false;
-var TOPHAT_RADIUS;
-
-var UNSHARP = false;
-var UNSHARP_RADIUS = 2;
-var UNSHARP_STRENGTH = 0.6;
-
 
 macro "Organelle_intensity_measure [F9]" {
 	t = getTime();
@@ -43,6 +30,7 @@ macro "Organelle_intensity_measure [F9]" {
 	for (i=0;i<imagefilelist.length;i++) {
 
 		image = imagefilelist[i];
+		//print("Current image title being processed:" +image);
 		Measure_intensity(imagefilelist[i]);
 	}
 	setBatchMode("exit & display");
@@ -82,6 +70,7 @@ macro "Organelle_intensity_measure [F9]" {
 // ......................................................
 
 function Measure_intensity(image) {
+	setOption("ExpandableArrays", true);
 	dim_unit = newArray;
 	px_wd = newArray;
 	px_ht = newArray;
@@ -91,19 +80,19 @@ function Measure_intensity(image) {
 	
 
 	run("ROI Manager...");
-	modified_name = "original";
+	//modified_name = "original";
 	if (endsWith(image, "tif")) {
 		open(imagepath+image);
 		imname = getTitle();
 		imext = indexOf(imname,".tif");
 
 		selectWindow(imname);
-		run("Duplicate...", "title="+modified_name);
+		//run("Duplicate...", "title="+modified_name);
 		
-		selectWindow(modified_name);
+		//selectWindow(modified_name);
 		
-		close_channels();
-		selectWindow(modified_name+" "+"("+organelle_channel+")");
+		close_channels(imname);
+		selectWindow(imname+" "+"("+organelle_channel+")");
 		getPixelSize(unit, pixelWidth, pixelHeight);
 		run("Set Scale...", "distance=0 known=0 unit=pixel");
 			
@@ -119,7 +108,8 @@ function Measure_intensity(image) {
 				
 				for (z=0;z<roifilelist.length;z++) {
 					if (endsWith(roifilelist[z],".roi")) {
-						temproilist = Array.concat(temproilist,roifilelist[z]);
+						temproilist = Array.concat(temproilist,
+							roifilelist[z]);
 					}
 				}
 				if (temproilist.length !=0) {
@@ -133,7 +123,7 @@ function Measure_intensity(image) {
 						roiname = substring(roi,0,roiext);
 						prefix = prefixfolder+"##"+roifoldername+"##";
 					
-						selectWindow(modified_name+" "+"("+organelle_channel+")");
+						selectWindow(imname+" "+"("+organelle_channel+")");
 						px_wd[r] = pixelWidth;
 						px_ht[r] = pixelHeight;
 						dim_unit[r] = unit;
@@ -141,16 +131,23 @@ function Measure_intensity(image) {
 						roiManager("Select",r);
 						Cell_area[r] = getValue ("Area");
 						roiManager("Select",r);
+						//wait(5000);	
 						Cell_rawintden[r] = getValue("RawIntDen");
 
 
 					}
+					if (isOpen("ROI Manager")) {
+						roiManager("reset");
+						selectWindow("ROI Manager");
+        				run("Close");
+    				}
 					Cell_idArray = Array.concat(Cell_idArray,Cell_id);
 					Px_widthArray = Array.concat(Px_widthArray, px_wd);
 					Px_heightArray = Array.concat(Px_heightArray,px_ht);
 					Px_unitArray = Array.concat(Px_unitArray,dim_unit);
 					Cell_areaArray = Array.concat(Cell_areaArray,Cell_area);
-					Organelle_raw_intdenArray = Array.concat(Organelle_raw_intdenArray,Cell_rawintden);
+					Organelle_raw_intdenArray = Array.concat(Organelle_raw_intdenArray,
+						Cell_rawintden);
 
 				}
 					
@@ -180,10 +177,10 @@ function select_channels () {
 
 
 // ****************************************************************
-function close_channels() {
-	selectWindow(modified_name);
+function close_channels(imname) {
+	selectWindow(imname);
 	run("Split Channels");
-	selectWindow (modified_name+" "+"("+organelle_channel+")");
+	selectWindow (imname+" "+"("+organelle_channel+")");
 	close("\\Others");
 }
 
