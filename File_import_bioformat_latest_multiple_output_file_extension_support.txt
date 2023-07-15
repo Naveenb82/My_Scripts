@@ -1,0 +1,526 @@
+var input_file_ext;
+var output_file_ext;
+var img_ch;
+var red;
+var blue;
+var green;
+var far_red;
+var Bright_field;
+var slices;
+var MIP;
+var z_stack;
+var begin;
+var end;
+var value;
+
+macro "File_import_nd2 [F9]" {
+	run("Close All");
+	run("Bio-Formats Macro Extensions");
+	img_metadata () ;
+	select_channels();
+	num_slices();
+	dir = getDirectory("Choose a Directory");
+	print("Directory:", dir);
+	output_path = dir+"Composite_"+output_file_ext+File.separator;
+	if (File.isDirectory(output_path) == false) {
+		File.makeDirectory(output_path);
+	}
+	supportedFileFormat = "."+input_file_ext;
+	file_list = getFileList(dir);
+	setBatchMode(true);
+	for (i=0;i<file_list.length;i++) {
+		if (endsWith(file_list[i], supportedFileFormat)==true) {
+			//Array.print(file_list);
+			//Ext.isThisType(dir + file_list[i], supportedFileFormat);
+			id = dir+file_list[i];
+			nd_file = file_list[i];
+			
+			Ext.setId(id);
+			//print("Ext.setId:", Ext.setId(dir+file_list[i]));
+			Ext.getSeriesCount(seriesCount);
+			//print("Ext.getSeriesCount:", seriesCount);
+			if (seriesCount > 1) {
+				for (k = 0;k <seriesCount;k++) {
+					Ext.setSeries(k);
+					print("Ext.setSeries:", k);
+					Ext.getSeriesName(seriesName);
+		
+					run("Bio-Formats Importer", "open=["+id+"] autoscale color_mode=Colorized view=Hyperstack stack_order=XYCZT series_"+(k+1));
+					selectWindow(nd_file+" - "+seriesName);
+					numSlices = nSlices;
+					//print("Number of Slices", numSlices);
+					//nd_fname = seriesName;
+					output_name = seriesName+"_composite.tif";
+					//print("nd_fname", nd_fname);
+					if (img_ch == 1) {
+						if (z_stack == false) {
+							selectWindow(nd_file+" - "+seriesName);
+							saveAs(output_file_ext, output_path+output_name);
+							close("*");
+						}
+						else {
+							if (slices == "All") {
+
+								if (MIP == true) {
+									run("Z Project...", "projection=[Max Intensity]");
+									selectWindow("MAX_"+nd_file+" - "+seriesName);
+									//run("RGB Color");
+									saveAs(output_file_ext, output_path+output_name);
+									close("*");
+								}
+								else {
+									selectWindow(nd_file+" - "+seriesName);
+									saveAs(output_file_ext, output_path+output_name);
+									close("*");
+								}
+							}
+							else if (slices == "Middle+") {
+								if (MIP == true) {
+									mid = Math.floor(numSlices/(2*img_ch));
+									begin = mid-value;
+									end = mid+value;
+									run("Make Substack...", "channels=1-"+img_ch+" slices="+begin+"-"+end);
+									selectWindow(nd_file+" - "+seriesName+"-1");
+									run("Z Project...", "projection=[Max Intensity]");
+									selectWindow("MAX_"+nd_file+" - "+seriesName+"-1");
+									//run("RGB Color");
+									saveAs(output_file_ext, output_path+output_name);
+									close("*");
+								}
+								else {
+									mid = Math.floor(numSlices/(2*img_ch));
+									begin = mid-value;
+									end = mid+value;
+									run("Make Substack...", "channels=1-"+img_ch+" slices="+begin+"-"+end);
+									selectWindow(nd_file+" - "+seriesName+"-1");
+									//run("RGB Color");
+									saveAs(output_file_ext, output_path+output_name);
+									close("*");
+								}
+							}
+							else if (slices == "Sub-stack") {
+								run("Make Substack...", "channels=1-"+img_ch+" slices="+begin+"-"+end);
+								if (MIP == true) {
+									selectWindow(nd_file+" - "+seriesName+"-1");
+									run("Z Project...", "projection=[Max Intensity]");
+									selectWindow("MAX_"+nd_file+" - "+seriesName+"-1");
+									//run("RGB Color");
+									saveAs(output_file_ext, output_path+output_name);
+									close("*");
+								}
+								else {
+									selectWindow(nd_file+" - "+seriesName+"-1");
+									saveAs(output_file_ext, output_path+output_name);
+									close("*");
+								}
+							}
+							else {
+								mid = Math.floor(numSlices/(2*img_ch));
+								run("Make Substack...", "channels=1-"+img_ch+" slices="+mid+"-"+mid);
+								selectWindow(nd_file+" - "+seriesName+"-1");
+								saveAs(output_file_ext, output_path+output_name);
+								close("*");
+							}
+						}
+					}
+					else {
+						if (z_stack == false) {
+							selectWindow(nd_file+" - "+seriesName);
+							//run("Make Composite");
+							//run("RGB Color");
+							selectWindow(nd_file+" - "+seriesName);
+							saveAs(output_file_ext, output_path+output_name);
+							close("*");
+						}
+						else {
+							if (slices == "All") {
+								if (MIP == true) {
+									selectWindow(nd_file+" - "+seriesName);
+									run("Z Project...", "projection=[Max Intensity]");
+									selectWindow("MAX_"+nd_file+" - "+seriesName);
+									//run("Make Composite");
+									//selectWindow("MAX_"+nd_fname+"-1.nd2");
+									//run("RGB Color");
+									selectWindow("MAX_"+nd_file+" - "+seriesName);
+									saveAs(output_file_ext, output_path+output_name);
+									close("*");
+								}
+								else {
+									selectWindow(nd_file+" - "+seriesName);
+									saveAs(output_file_ext, output_path+output_name);
+									close("*");
+								}
+							}
+							else if (slices == "Middle+") {
+								if (MIP == true) {
+									mid = Math.floor(numSlices/(2*img_ch));
+									begin = mid-value;
+									end = mid+value;
+									run("Make Substack...", "channels=1-"+img_ch+" slices="+begin+"-"+end);
+									selectWindow(nd_file+" - "+seriesName+"-1");
+									run("Z Project...", "projection=[Max Intensity]");
+									selectWindow("MAX_"+nd_file+" - "+seriesName+"-1");
+									//run("Make Composite");
+									//run("RGB Color");
+									selectWindow("MAX_"+nd_file+" - "+seriesName+"-1");
+									saveAs(output_file_ext, output_path+output_name);
+									close("*");
+								}
+								else {
+									mid = Math.floor(numSlices/(2*img_ch));
+									begin = mid-value;
+									end = mid+value;
+									run("Make Substack...", "channels=1-"+img_ch+" slices="+begin+"-"+end);
+									selectWindow(nd_file+" - "+seriesName+"-1");
+									saveAs(output_file_ext, output_path+output_name);
+									close("*");
+								}
+							}
+							else if (slices == "Sub-stack") {
+								selectWindow(nd_file+" - "+seriesName);
+								run("Make Substack...", "channels=1-"+img_ch+" slices="+begin+"-"+end);
+								if (MIP == true) {
+									selectWindow(nd_file+" - "+seriesName+"-1");
+									run("Z Project...", "projection=[Max Intensity]");
+									selectWindow("MAX_"+nd_file+" - "+seriesName+"-1");
+									//run("Make Composite");
+									//run("RGB Color");
+									selectWindow("MAX_"+nd_file+" - "+seriesName+"-1");
+									saveAs(output_file_ext, output_path+output_name);
+									close("*");
+								}
+								else {
+									selectWindow(nd_file+" - "+seriesName+"-1");
+									saveAs(output_file_ext, output_path+output_name);
+									close("*");
+								}
+							}
+							else {
+								mid = Math.floor(numSlices/(2*img_ch));
+								run("Make Substack...", "channels=1-"+img_ch+" slices="+mid+"-"+mid);
+								selectWindow(nd_file+" - "+seriesName+"-1");
+								//run("Make Composite");
+								//run("RGB Color");
+								selectWindow(nd_file+" - "+seriesName+"-1");
+								saveAs(output_file_ext, output_path+output_name);
+								close("*");
+							}
+						}
+					}
+				}
+			}
+			else {
+				run("Bio-Formats Importer", "open=["+id+"] autoscale color_mode=Colorized view=Hyperstack stack_order=XYCZT");
+				selectWindow(nd_file);
+				numSlices = nSlices;
+				//print("Number of Slices", numSlices);
+				nd_fname = File.nameWithoutExtension;
+				output_name = nd_fname+"_composite.tif";
+				//print("nd_fname", nd_fname);
+				if (img_ch == 1) {
+					if (z_stack == false) {
+						selectWindow(nd_file);
+						saveAs(output_file_ext, output_path+output_name);
+						close("*");
+					}
+					else {
+						if (slices == "All") {
+
+							if (MIP == true) {
+								run("Z Project...", "projection=[Max Intensity]");
+								selectWindow("MAX_"+nd_fname+".nd2");
+								//run("RGB Color");
+								saveAs(output_file_ext, output_path+output_name);
+								close("*");
+							}
+							else {
+								selectWindow(nd_file);
+								saveAs(output_file_ext, output_path+output_name);
+								close("*");
+							}
+						}
+						else if (slices == "Middle+") {
+							if (MIP == true) {
+								mid = Math.floor(numSlices/(2*img_ch));
+								begin = mid-value;
+								end = mid+value;
+								run("Make Substack...", "channels=1-"+img_ch+" slices="+begin+"-"+end);
+								selectWindow(nd_fname+"-1.nd2");
+								run("Z Project...", "projection=[Max Intensity]");
+								selectWindow("MAX_"+nd_fname+"-1.nd2");
+								//run("RGB Color");
+								saveAs(output_file_ext, output_path+output_name);
+								close("*");
+							}
+							else {
+								mid = Math.floor(numSlices/(2*img_ch));
+								begin = mid-value;
+								end = mid+value;
+								run("Make Substack...", "channels=1-"+img_ch+" slices="+begin+"-"+end);
+								selectWindow(nd_fname+"-1.nd2");
+								//run("RGB Color");
+								saveAs(output_file_ext, output_path+output_name);
+								close("*");
+							}
+						}
+						else if (slices == "Sub-stack") {
+							run("Make Substack...", "channels=1-"+img_ch+" slices="+begin+"-"+end);
+							if (MIP == true) {
+								selectWindow(nd_fname+"-1.nd2");
+								run("Z Project...", "projection=[Max Intensity]");
+								selectWindow("MAX_"+nd_fname+"-1.nd2");
+								//run("RGB Color");
+								saveAs(output_file_ext, output_path+output_name);
+								close("*");
+							}
+							else {
+								selectWindow(nd_fname+"-1.nd2");
+								saveAs(output_file_ext, output_path+output_name);
+								close("*");
+							}
+						}
+						else {
+							mid = Math.floor(numSlices/(2*img_ch));
+							run("Make Substack...", "channels=1-"+img_ch+" slices="+mid+"-"+mid);
+							selectWindow(nd_fname+"-1.nd2");
+							saveAs(output_file_ext, output_path+output_name);
+							close("*");
+						}
+					}
+				}
+				else {
+					if (z_stack == false) {
+						selectWindow(nd_file);
+						//run("Make Composite");
+						//run("RGB Color");
+						selectWindow(nd_file);
+						saveAs(output_file_ext, output_path+output_name);
+						close("*");
+					}
+					else {
+						if (slices == "All") {
+							if (MIP == true) {
+								selectWindow(nd_file);
+								run("Z Project...", "projection=[Max Intensity]");
+								selectWindow("MAX_"+nd_fname+".nd2");
+								//run("Make Composite");
+								//selectWindow("MAX_"+nd_fname+"-1.nd2");
+								//run("RGB Color");
+								selectWindow("MAX_"+nd_fname+".nd2");
+								saveAs(output_file_ext, output_path+output_name);
+								close("*");
+							}
+							else {
+								selectWindow(nd_file);
+								saveAs(output_file_ext, output_path+output_name);
+								close("*");
+							}
+						}
+						else if (slices == "Middle+") {
+							if (MIP == true) {
+								mid = Math.floor(numSlices/(2*img_ch));
+								begin = mid-value;
+								end = mid+value;
+								run("Make Substack...", "channels=1-"+img_ch+" slices="+begin+"-"+end);
+								selectWindow(nd_fname+"-1.nd2");
+								run("Z Project...", "projection=[Max Intensity]");
+								selectWindow("MAX_"+nd_fname+"-1.nd2");
+								//run("Make Composite");
+								//run("RGB Color");
+								selectWindow("MAX_"+nd_fname+"-1.nd2");
+								saveAs(output_file_ext, output_path+output_name);
+								close("*");
+							}
+							else {
+								mid = Math.floor(numSlices/(2*img_ch));
+								begin = mid-value;
+								end = mid+value;
+								run("Make Substack...", "channels=1-"+img_ch+" slices="+begin+"-"+end);
+								selectWindow(nd_fname+"-1.nd2");
+								saveAs(output_file_ext, output_path+output_name);
+								close("*");
+							}
+						}
+						else if (slices == "Sub-stack") {
+							selectWindow(nd_file);
+							run("Make Substack...", "channels=1-"+img_ch+" slices="+begin+"-"+end);
+							if (MIP == true) {
+								selectWindow(nd_fname+"-1.nd2");
+								run("Z Project...", "projection=[Max Intensity]");
+								selectWindow("MAX_"+nd_fname+"-1.nd2");
+								//run("Make Composite");
+								//run("RGB Color");
+								selectWindow("MAX_"+nd_fname+"-1.nd2");
+								saveAs(output_file_ext, output_path+output_name);
+								close("*");
+							}
+							else {
+								selectWindow(nd_fname+"-1.nd2");
+								saveAs(output_file_ext, output_path+output_name);
+								close("*");
+							}
+						}
+						else {
+							mid = Math.floor(numSlices/(2*img_ch));
+							run("Make Substack...", "channels=1-"+img_ch+" slices="+mid+"-"+mid);
+							selectWindow(nd_fname+"-1.nd2");
+							//run("Make Composite");
+							//run("RGB Color");
+							selectWindow(nd_fname+"-1.nd2");
+							saveAs(output_file_ext, output_path+output_name);
+							close("*");
+						}
+					}
+				}
+			}
+		
+		}
+		Ext.close();
+	}
+	setBatchMode("exit & display");	
+	img_ch = 0;
+	red = 0;
+	blue = 0;
+	green = 0;
+	Bright_field = 0;
+	slices = "All";
+	MIP = false;
+	z_stack = false;
+	begin = 1;
+	end = 1;
+	value =0;	
+	close("*");
+	print("Run finished...");
+}
+function img_metadata () {
+	ext_input = newArray("nd2", "lif");
+	default_ext_input = newArray(1,0);
+	ext_output = newArray("tif", "png", "jpg");
+	default_ext_output = newArray(1,0,0);
+	Dialog.create("Select input and output file Extensions:");
+	Dialog.addRadioButtonGroup("Input File Extension:", ext_input,1,2,ext_input[0]);
+	Dialog.addRadioButtonGroup("Output File Extension:",ext_output,1,3,ext_output[0]);
+	Dialog.show();
+	input_file_ext = Dialog.getRadioButton();
+	output_file_ext = Dialog.getRadioButton();
+}
+
+function select_channels() {
+	pseudo_colors = newArray("red", "blue", "green", "far_red", "Bright_field");
+	
+	default_colors = newArray(0,0,0,0,0);
+	
+	Dialog.create("Select channels to used for imaging:");
+	Dialog.addCheckboxGroup(1,5,pseudo_colors,default_colors);
+	Dialog.addMessage("Mark the box if images are z-stack");
+	Dialog.addCheckbox("Z", false);
+	Dialog.show();
+
+	red = Dialog.getCheckbox();
+	blue = Dialog.getCheckbox();
+	green = Dialog.getCheckbox();
+	far_red = Dialog.getCheckbox();
+	Bright_field = Dialog.getCheckbox();
+	z_stack = Dialog.getCheckbox();
+	img_ch = red+blue+green+far_red+Bright_field;
+
+	
+}
+
+function rm_channels() {
+	if (img_ch <1) {
+		exit("None of the channels selected!");
+	}
+	else if (img_ch ==2){
+		if (blue == 1 && green == 1) {
+			
+			used_ch = newArray("blue", "green");
+		}
+		if (blue == 1 && red == 1){
+			
+			used_ch = newArray("blue", "red");
+		}
+		if (red ==1 && green ==1){
+			
+			used_ch = newArray("red", "green");
+		}
+		if (red == 1 && Bright_field == 1) {
+
+			used_ch = newArray("red", "Bright_field");
+		}
+		if (blue == 1 && Bright_field == 1) {
+
+			used_ch = newArray("blue", "Bright_field");
+		}
+		if (green == 1 && Bright_field == 1) {
+
+			used_ch = newArray("green", "Bright_field");
+		}
+		
+	}
+	else if (img_ch == 3) {
+		if (blue == 1 && green == 1 && red == 1) {
+			
+			used_ch = newArray("blue", "green", "red");
+		}
+		if (blue == 1 && red == 1 && Bright_field == 1){
+			
+			used_ch = newArray("blue", "red", "Bright_field");
+		}
+		if (red ==1 && green ==1 && Bright_field == 1){
+			
+			used_ch = newArray("red", "green", "Bright_field");
+		}
+		if (blue == 1 && green ==1 && Bright_field == 1) {
+
+			used_ch = newArray("blue", "green", "Bright_field");
+		}
+	}
+	else {
+		used_ch = newArray("blue", "green", "red", "far_red", "Bright_field");
+	}
+		
+	default_rm_colors = newArray(0,0,0,0,0);
+	
+	Dialog.create("Select channels to remove after conversion:");
+	Dialog.addCheckboxGroup(1,used_ch.length,used_ch,default_rm_colors);
+	
+	Dialog.show();
+
+	rm_red = Dialog.getCheckbox();
+	rm_blue = Dialog.getCheckbox();
+	rm_green = Dialog.getCheckbox();
+	rm_Bright_field = Dialog.getCheckbox();
+	
+	img_ch = (red+blue+green+Bright_field)-(rm_red+rm_blue+rm_green+rm_Bright_field);
+}
+
+function num_slices() {
+	if (z_stack == true) {
+		options = newArray("All", "Middle", "Middle+", "Sub-stack");
+		defaults = newArray(0,0,0,0);
+		Dialog.create("Select z-slices to be used for conversion:");
+		Dialog.addRadioButtonGroup("Slices", options,1,3,options[1]);
+		Dialog.addMessage("Select pre-process (if any) for z-slices during conversion:");
+		Dialog.addCheckbox("MaxIntProjection", false);
+		Dialog.show();
+		slices = Dialog.getRadioButton();
+		MIP = Dialog.getCheckbox();
+	}
+	if (slices == "Sub-stack") {
+		Dialog.create ("Choose range for Sub-stack:");
+		Dialog.addNumber("begin",1);
+		Dialog.addNumber("end",1);
+		Dialog.show();
+		begin = Dialog.getNumber();
+		end = Dialog.getNumber();
+	}
+	else if(slices == "Middle+") {
+		Dialog.create ("Choose a value for the number of slices \n around the middle to be retained:");
+		Dialog.addNumber("value",0);
+		
+		Dialog.show();
+		value = Dialog.getNumber();
+	}
+	
+}
